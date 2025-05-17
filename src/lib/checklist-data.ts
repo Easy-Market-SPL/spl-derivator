@@ -22,8 +22,7 @@ export interface ChecklistSection {
  * the feature model).  `multi`   → normal checkbox list.
  */
 export const groupTypes: Record<string, GroupType> = {
-  'tracking-mode': 'single',      // Alternativa: seguimiento por estados o en tiempo real
-  'payment-method': 'single'      // Alternativa: pago con tarjeta o en efectivo
+  'tracking-mode': 'single'
 };
 
 export const checklistSections: ChecklistSection[] = [
