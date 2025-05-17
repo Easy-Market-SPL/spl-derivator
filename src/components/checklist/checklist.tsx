@@ -8,13 +8,16 @@ import {
   ChecklistItem
 } from '@/lib/checklist-data';
 
+// Helper to flatten all items once – makes lookup trivial.
 const allItems: ChecklistItem[] = checklistSections.flatMap(s => s.items);
 const idToItem = new Map(allItems.map(i => [i.id, i]));
 
 export default function Checklist() {
+  /** state: id → selected? */
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [summary, setSummary] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
+  /** Group → ids[], memoised so we only compute once. */
   const groupIndex = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const itm of allItems) {
@@ -104,21 +107,27 @@ export default function Checklist() {
     };
   };
 
-  const downloadFile = (filename: string, content: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportEnvFiles = () => {
+  // Enviar solicitud al backend para mandar email
+  const sendEmail = async () => {
+    setSending(true);
     const { front, back } = generateEnvContents();
-    downloadFile('.env.front', front);
-    downloadFile('.env.back', back);
-    alert('Archivos .env.front y .env.back generados y descargados.');
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ envFront: front, envBack: back }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Solicitud enviada correctamente. Revisa tu correo.');
+      } else {
+        alert('Error al enviar la solicitud: ' + (data.error ?? ''));
+      }
+    } catch (err) {
+      alert('Error de conexión: ' + String(err));
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -174,16 +183,14 @@ export default function Checklist() {
 
       <div className="mt-6 flex flex-col items-start gap-3">
         <button
-          onClick={exportEnvFiles}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+          onClick={sendEmail}
+          disabled={sending}
+          className={`px-4 py-2 rounded text-white transition ${
+            sending ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+          }`}
         >
-          Exportar archivos .env
+          {sending ? 'Enviando...' : 'Enviar solicitud'}
         </button>
-        {summary && (
-          <pre className="max-h-96 overflow-auto bg-gray-100 p-4 rounded text-sm text-gray-800 whitespace-pre-wrap">
-            {summary}
-          </pre>
-        )}
       </div>
     </>
   );
