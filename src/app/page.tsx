@@ -1,22 +1,3 @@
-/*
-  EasyMarket – Single‑Page Application (Next.js 14 / React 18)
-  ----------------------------------------------------------------
-  📦  Dependencies (add to package.json):
-      "next": "latest",
-      "react": "latest",
-      "react-dom": "latest",
-      "react-awesome-reveal": "^4",
-      "tailwindcss": "latest"
-
-  ✨  Tailwind setup is assumed (postcss + autoprefixer). See https://tailwindcss.com/docs/guides/nextjs
-      for the two‑minute install.
-
-  ----------------------------------------------------------------
-  The code below lives in `/app/page.tsx` (Next.js 14 `app/` router) or in
-  `/pages/index.tsx` if you are using the pages router – it works in either case.
-  ----------------------------------------------------------------
-*/
-
 'use client';
 
 import Image from 'next/image';
@@ -70,7 +51,7 @@ function Header({ show }: { show: boolean }) {
     >
       <div className="max-w-screen-xl mx-auto flex items-center gap-3 px-6 py-3">
         {/* Logo */}
-        <Image src="/logo.svg" alt="EasyMarket logo" width={40} height={40} />
+        <Image src="/images/icon.png" alt="EasyMarket logo" width={40} height={40} />
         <span className="font-extrabold text-xl text-blue-900">EasyMarket</span>
       </div>
     </header>
@@ -157,10 +138,10 @@ export default function Home() {
         {/* conveyor illustration */}
         <Slide direction="up" damping={0.1} triggerOnce>
           <Image
-            src="/conveyor.svg"
+            src="/images/logo.png"
             alt="Conveyor illustration"
-            width={500}
-            height={200}
+            width={800}
+            height={500}
             className="mt-10"
           />
         </Slide>
