@@ -1,34 +1,45 @@
-// app/api/send-email/route.ts
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
-    const { envFront, envBack } = await request.json();
+    const { envFeats, companyName, companyEmail } = await request.json();
 
-    // Configura aquí tu SMTP o usa variables de entorno
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
-      secure: false, // true for 465, false for other ports
+      secure: false,
       auth: {
         user: "easymarketspl@gmail.com",
-        pass: process.env.SMTP_PASS
+        pass: process.env.SMTP_PASS,
       },
     });
 
-    const mailOptions = {
+    // Correo para easymarketspl@gmail.com con solicitud
+    const mailOptionsAdmin = {
       from: process.env.SMTP_FROM || '"EasyMarketSPL" <no-reply@easymarket.com>',
       to: 'easymarketspl@gmail.com',
-      subject: '[NUEVO] Solicitud de Producto',
+      subject: `[NUEVO] Solicitud de Producto - ${companyName}`,
       text: 'Se ha registrado una nueva solicitud de producto para EasyMarketSPL.',
       attachments: [
-        { filename: '.env.front', content: envFront },
-        { filename: '.env.back', content: envBack },
+        { filename: '.env.feats', content: envFeats },
       ],
     };
 
-    await transporter.sendMail(mailOptions);
+    // Correo para el usuario confirmando recepción
+    const mailOptionsUser = {
+      from: process.env.SMTP_FROM || '"EasyMarketSPL" <no-reply@easymarket.com>',
+      to: companyEmail,
+      subject: 'Confirmación de solicitud EasyMarketSPL',
+      text: `Hola,\n\nGracias por su solicitud de producto para EasyMarketSPL. Estamos procesando su requerimiento y nos pondremos en contacto pronto.\n\nAtentamente,\nEquipo EasyMarketSPL`,
+    };
+
+    // Enviar ambos correos en paralelo
+    await Promise.all([
+      transporter.sendMail(mailOptionsAdmin),
+      transporter.sendMail(mailOptionsUser),
+    ]);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error enviando email:', error);

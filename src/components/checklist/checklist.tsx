@@ -16,6 +16,8 @@ export default function Checklist() {
   /** state: id → selected? */
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [sending, setSending] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [companyEmail, setCompanyEmail] = useState('');
 
   /** Group → ids[], memoised so we only compute once. */
   const groupIndex = useMemo(() => {
@@ -76,50 +78,54 @@ export default function Checklist() {
     });
   }, [selected]);
 
-  // Mapea las features seleccionadas a variables de entorno con true/false explícitos
-  const generateEnvContents = () => {
-    const frontMap: Record<string, string> = {
+  const generateEnvContent = () => {
+    const featureMap: Record<string, string> = {
       RATINGS_ENABLED: 'support-rating',
       CHAT_ENABLED: 'support-chat',
       THIRD_AUTH_ENABLED: 'auth-third',
       REALTIME_TRACKING_ENABLED: 'realtime-track',
       CASH_ENABLED: 'payments-cash',
       CREDIT_CARD_ENABLED: 'payments-card',
-    };
-
-    const backMap: Record<string, string> = {
       FEAT_NOTIFICATIONS: 'notifications',
     };
 
-    const frontLines = ['# FEATURE TOGGLES', ''];
-    for (const [envVar, featId] of Object.entries(frontMap)) {
-      frontLines.push(`${envVar}=${selected[featId] ? 'true' : 'false'}`);
-    }
-
-    const backLines = ['# FEATURE TOGGLES', ''];
-    for (const [envVar, featId] of Object.entries(backMap)) {
-      backLines.push(`${envVar}=${selected[featId] ? 'true' : 'false'}`);
-    }
-
-    return {
-      front: frontLines.join('\n'),
-      back: backLines.join('\n'),
+    const deviceMap: Record<string, string> = {
+      MOBILE: 'gui-mobile',
+      WEB: 'gui-web',
     };
+
+    const lines = ['# FEATURE TOGGLES', ''];
+
+    for (const [envVar, featId] of Object.entries(deviceMap)) {
+      lines.push(`${envVar}=${selected[featId] ? 'true' : 'false'}`);
+    }
+
+    for (const [envVar, featId] of Object.entries(featureMap)) {
+      lines.push(`${envVar}=${selected[featId] ? 'true' : 'false'}`);
+    }
+
+    return lines.join('\n');
   };
 
-  // Enviar solicitud al backend para mandar email
   const sendEmail = async () => {
+    if (!companyName.trim() || !companyEmail.trim()) {
+      alert('Por favor ingresa el nombre y correo de la empresa.');
+      return;
+    }
     setSending(true);
-    const { front, back } = generateEnvContents();
+    const envFeats = generateEnvContent();
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ envFront: front, envBack: back }),
+        body: JSON.stringify({ envFeats, companyName, companyEmail }),
       });
       const data = await res.json();
       if (data.success) {
         alert('Solicitud enviada correctamente. Revisa tu correo.');
+        setCompanyName('');
+        setCompanyEmail('');
+        setSelected({});
       } else {
         alert('Error al enviar la solicitud: ' + (data.error ?? ''));
       }
@@ -133,6 +139,33 @@ export default function Checklist() {
   return (
     <>
       <div className="space-y-4">
+        {/* Inputs para empresa */}
+        <div className="flex flex-col gap-4 max-w-md">
+          <label className="flex flex-col text-gray-700">
+            Nombre de la empresa:
+            <input
+              type="text"
+              value={companyName}
+              onChange={e => setCompanyName(e.target.value)}
+              className="mt-1 border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ejemplo: Mi Empresa S.A."
+              required
+            />
+          </label>
+          <label className="flex flex-col text-gray-700">
+            Correo electrónico:
+            <input
+              type="email"
+              value={companyEmail}
+              onChange={e => setCompanyEmail(e.target.value)}
+              className="mt-1 border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="ejemplo@empresa.com"
+              required
+            />
+          </label>
+        </div>
+
+        {/* Checklist */}
         {checklistSections.map(section => (
           <Fade key={section.id} cascade damping={0.13} triggerOnce>
             <h3 className="text-lg font-semibold text-gray-900">
@@ -181,7 +214,7 @@ export default function Checklist() {
         ))}
       </div>
 
-      <div className="mt-6 flex flex-col items-start gap-3">
+      <div className="mt-6 flex flex-col items-start gap-3 max-w-md">
         <button
           onClick={sendEmail}
           disabled={sending}
