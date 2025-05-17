@@ -1,103 +1,217 @@
-import Image from "next/image";
+/*
+  EasyMarket – Single‑Page Application (Next.js 14 / React 18)
+  ----------------------------------------------------------------
+  📦  Dependencies (add to package.json):
+      "next": "latest",
+      "react": "latest",
+      "react-dom": "latest",
+      "react-awesome-reveal": "^4",
+      "tailwindcss": "latest"
+
+  ✨  Tailwind setup is assumed (postcss + autoprefixer). See https://tailwindcss.com/docs/guides/nextjs
+      for the two‑minute install.
+
+  ----------------------------------------------------------------
+  The code below lives in `/app/page.tsx` (Next.js 14 `app/` router) or in
+  `/pages/index.tsx` if you are using the pages router – it works in either case.
+  ----------------------------------------------------------------
+*/
+
+'use client';
+
+import Image from 'next/image';
+import { useState, useEffect, useRef } from 'react';
+import { Fade, Slide } from 'react-awesome-reveal';
+
+interface ChecklistItem {
+  id: string;
+  label: string;
+  requires?: string[];   // IDs that must be checked first
+  disables?: string[];   // IDs that will be disabled if this is checked
+}
+
+const checklistData: ChecklistItem[] = [
+  { id: 'gui-web', label: 'GUI Web' },
+  { id: 'gui-mobile', label: 'GUI Móvil' },
+  { id: 'auth-email', label: 'Autenticación por email' },
+  { id: 'auth-third', label: 'Autenticación con terceros', requires: ['auth-email'] },
+  { id: 'catalog-search', label: 'Búsqueda de bienes' },
+  { id: 'catalog-filter', label: 'Filtrado de bienes', requires: ['catalog-search'] },
+  { id: 'orders-tracking', label: 'Seguimiento de órdenes' },
+  { id: 'orders-notify', label: 'Notificaciones de cambios', requires: ['orders-tracking'] },
+  { id: 'realtime-track', label: 'Seguimiento en tiempo real', requires: ['orders-tracking'], disables: ['orders-notify'] },
+  { id: 'payments-card', label: 'Pago con tarjeta' },
+  { id: 'payments-cash', label: 'Pago en efectivo' }
+];
+
+function useHeaderVisibility(heroRef: React.RefObject<HTMLElement | null>) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!heroRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+
+    observer.observe(heroRef.current);
+    return () => observer.disconnect();
+  }, [heroRef]);
+
+  return visible;
+}
+
+function Header({ show }: { show: boolean }) {
+  return (
+    <header
+      className={`z-50 w-full top-0 transition-transform duration-300 ${
+        show ? 'fixed backdrop-blur-md bg-white/80 shadow-md' : 'absolute'
+      }`}
+    >
+      <div className="max-w-screen-xl mx-auto flex items-center gap-3 px-6 py-3">
+        {/* Logo */}
+        <Image src="/logo.svg" alt="EasyMarket logo" width={40} height={40} />
+        <span className="font-extrabold text-xl text-blue-900">EasyMarket</span>
+      </div>
+    </header>
+  );
+}
+
+function Checklist() {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  const handleToggle = (item: ChecklistItem) => {
+    setChecked(prev => {
+      const newState = { ...prev };
+      const newValue = !prev[item.id];
+
+      // enforce requires
+      if (newValue && item.requires) {
+        const unmet = item.requires.find(req => !prev[req]);
+        if (unmet) {
+          alert('Este elemento requiere seleccionar primero: ' + unmet);
+          return prev;
+        }
+      }
+
+      newState[item.id] = newValue;
+
+      // enforce disables
+      if (item.disables) {
+        item.disables.forEach(dis => (newState[dis] = false));
+      }
+
+      return newState;
+    });
+  };
+
+  return (
+    <Fade cascade damping={0.12} triggerOnce>
+      <ul className="space-y-2">
+        {checklistData.map(item => {
+          const disabled =
+            !!item.requires?.find(req => !checked[req]) || // disabled until requirements met
+            !!item.disables?.find(dis => checked[item.id]); // already handled but keep greyed
+          return (
+            <li key={item.id} className="flex items-center gap-3">
+              <input
+                id={item.id}
+                type="checkbox"
+                className="h-5 w-5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
+                checked={!!checked[item.id]}
+                disabled={disabled}
+                onChange={() => handleToggle(item)}
+              />
+              <label htmlFor={item.id} className="select-none text-gray-800">
+                {item.label}
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </Fade>
+  );
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const heroRef = useRef<HTMLElement>(null);
+  const showHeader = useHeaderVisibility(heroRef);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  return (
+    <main className="min-h-screen flex flex-col">
+      {/* Hero Section */}
+      <section
+        ref={heroRef}
+        className="relative flex flex-col items-center justify-center text-center pt-24 md:pt-32 pb-32 bg-white"
+      >
+        <Fade direction="down" triggerOnce>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900">
+            ¡Bienvenido a <span className="text-blue-800 italic">EasyMarket</span>!
+          </h1>
+        </Fade>
+        <Fade delay={200} triggerOnce>
+          <p className="max-w-xl mt-4 text-lg md:text-xl text-gray-600">
+            Una solución para gestionar el proceso de ventas en tu empresa. Fácil y a tu manera.
+          </p>
+        </Fade>
+        {/* conveyor illustration */}
+        <Slide direction="up" damping={0.1} triggerOnce>
+          <Image
+            src="/conveyor.svg"
+            alt="Conveyor illustration"
+            width={500}
+            height={200}
+            className="mt-10"
+          />
+        </Slide>
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
+          {[
+            'Gestiona tu catálogo',
+            'Recibe y sigue tus órdenes',
+            'Conoce mejor a tus clientes'
+          ].map(text => (
+            <Fade key={text} delay={400} triggerOnce>
+              <button className="w-full px-6 py-4 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-2xl shadow-md transition-colors">
+                {text}
+              </button>
+            </Fade>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+        <Fade delay={600} triggerOnce>
+          <p className="mt-16 text-blue-600 font-semibold text-xl">Crea tu app ahora</p>
+        </Fade>
+
+        {/* down arrow */}
+        <Slide direction="down" delay={800} triggerOnce>
+          <svg
+            className="mt-4 h-8 w-8 text-gray-400 animate-bounce"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </Slide>
+      </section>
+
+      {/* Sticky Header */}
+      <Header show={showHeader} />
+
+      {/* Checklist section */}
+      <section className="flex-1 bg-gray-50 py-24 px-6">
+        <div className="max-w-screen-lg mx-auto">
+          <Slide direction="left" triggerOnce>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">Personaliza tu EasyMarketSPL</h2>
+          </Slide>
+          <Checklist />
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-blue-900 text-white text-center py-6">
+        <p className="text-sm">© {new Date().getFullYear()} EasyMarket – Todos los derechos reservados</p>
       </footer>
-    </div>
+    </main>
   );
 }
