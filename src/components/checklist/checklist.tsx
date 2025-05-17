@@ -1,81 +1,121 @@
+'use client';
+
 import { Fade } from 'react-awesome-reveal';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  checklistSections,
+  groupTypes,
+  ChecklistItem
+} from '@/lib/checklist-data';
 
-interface ChecklistItem {
-  id: string;
-  label: string;
-  requires?: string[];
-  disables?: string[];
-}
+// Helper to flatten all items once – makes lookup trivial.
+const allItems: ChecklistItem[] = checklistSections.flatMap(s => s.items);
+const idToItem = new Map(allItems.map(i => [i.id, i]));
 
-const checklistData: ChecklistItem[] = [
-  { id: 'gui-web', label: 'GUI Web' },
-  { id: 'gui-mobile', label: 'GUI Móvil' },
-  { id: 'auth-email', label: 'Autenticación por email' },
-  { id: 'auth-third', label: 'Autenticación con terceros', requires: ['auth-email'] },
-  { id: 'catalog-search', label: 'Búsqueda de bienes' },
-  { id: 'catalog-filter', label: 'Filtrado de bienes', requires: ['catalog-search'] },
-  { id: 'orders-tracking', label: 'Seguimiento de órdenes' },
-  { id: 'orders-notify', label: 'Notificaciones de cambios', requires: ['orders-tracking'] },
-  { id: 'realtime-track', label: 'Seguimiento en tiempo real', requires: ['orders-tracking'], disables: ['orders-notify'] },
-  { id: 'payments-card', label: 'Pago con tarjeta' },
-  { id: 'payments-cash', label: 'Pago en efectivo' }
-];
+export default function Checklist() {
+  /** state: id → selected? */
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
-function Checklist() {
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  /** Group → ids[], memoised so we only compute once. */
+  const groupIndex = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const itm of allItems) {
+      if (!itm.group) continue;
+      if (!map[itm.group]) map[itm.group] = [];
+      map[itm.group].push(itm.id);
+    }
+    return map;
+  }, []);
 
-  const handleToggle = (item: ChecklistItem) => {
-    setChecked(prev => {
-      const newState = { ...prev };
-      const newValue = !prev[item.id];
+  const toggle = (item: ChecklistItem) => {
+    setSelected(prev => {
+      // Clone before mutating
+      const next = { ...prev };
+      const currentValue = !!prev[item.id];
+      const willSelect = !currentValue;
 
-      // enforce requires
-      if (newValue && item.requires) {
+      // 1) Requirements (if selecting)
+      if (willSelect && item.requires) {
         const unmet = item.requires.find(req => !prev[req]);
         if (unmet) {
-          alert('Este elemento requiere seleccionar primero: ' + unmet);
-          return prev;
+          alert(`Este elemento requiere seleccionar primero: “${idToItem.get(unmet)?.label}”.`);
+          return prev; // block selection
         }
       }
 
-      newState[item.id] = newValue;
-
-      // enforce disables
-      if (item.disables) {
-        item.disables.forEach(dis => (newState[dis] = false));
+      // 2) Group logic (radio‑style)
+      if (item.group && groupTypes[item.group] === 'single') {
+        // Des‑seleccionar los demás elementos del grupo
+        for (const peerId of groupIndex[item.group] ?? []) {
+          next[peerId] = false;
+        }
       }
 
-      return newState;
+      // 3) Toggle current item
+      next[item.id] = willSelect;
+
+      // 4) Disable rules (auto‑untick targets)
+      if (willSelect && item.disables) {
+        for (const dis of item.disables) next[dis] = false;
+      }
+
+      return next;
     });
   };
 
+  const isDisabled = (itm: ChecklistItem): boolean => {
+    // Disabled until all requirements are met
+    return !!itm.requires?.find(req => !selected[req]);
+  };
+
   return (
-    <Fade cascade damping={0.12} triggerOnce>
-      <ul className="space-y-2">
-        {checklistData.map(item => {
-          const disabled =
-            !!item.requires?.find(req => !checked[req]) || // disabled until requirements met
-            !!item.disables?.find(dis => checked[item.id]); // already handled but keep greyed
-          return (
-            <li key={item.id} className="flex items-center gap-3">
-              <input
-                id={item.id}
-                type="checkbox"
-                className="h-5 w-5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
-                checked={!!checked[item.id]}
-                disabled={disabled}
-                onChange={() => handleToggle(item)}
-              />
-              <label htmlFor={item.id} className="select-none text-gray-800">
-                {item.label}
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-    </Fade>
+    <div className="space-y-4">
+      {checklistSections.map(section => (
+        <Fade key={section.id} cascade damping={0.13} triggerOnce>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {section.label}
+          </h3>
+          <p className="text-sm text-gray-800">{section.description}</p>
+          {/* List of included items */}
+          <p className="text-sm text-gray-800">
+            {section.included.length > 0 ? "Incluido en el paquete: " : ""}
+          </p>
+          <ul className="space-y-2 pl-2">
+            {section.included.map(item => (
+              <li key={item} className="flex text-sm items-center gap-3">
+                <label htmlFor={item} className="text-gray-800">
+                  - {item}
+                </label>
+              </li>
+            ))}
+          </ul>
+          {/* List of items */}
+          <ul className="space-y-2 pl-2">
+            {section.items.map(item => {
+              const disabled = isDisabled(item);
+              const groupSingle = item.group && groupTypes[item.group] === 'single';
+              return (
+                <li key={item.id} className="flex items-center gap-3">
+                  <input
+                    id={item.id}
+                    type={groupSingle ? 'radio' : 'checkbox'}
+                    name={groupSingle ? item.group : item.id}
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 disabled:opacity-40"
+                    checked={!!selected[item.id]}
+                    disabled={disabled}
+                    onChange={() => toggle(item)}
+                  />
+                  <label htmlFor={item.id} className="select-none text-gray-800">
+                    {item.label}
+                  </label>
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                </li>
+              );
+            })}
+          </ul>
+          <hr />
+        </Fade>
+      ))}
+    </div>
   );
 }
-
-export default Checklist;
